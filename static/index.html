@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Crypto Research Autopilot</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: '#6366f1',
+            surface: '#111827',
+            card: '#1f2937',
+            border: '#374151',
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- marked.js for markdown rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <style>
+    body { background: #0f172a; color: #e2e8f0; font-family: 'Inter', system-ui, sans-serif; }
+    .tab-btn { transition: all 0.15s; }
+    .tab-btn.active { background: #6366f1; color: white; }
+    .prose-dark h1, .prose-dark h2, .prose-dark h3 { color: #f1f5f9; margin: 1rem 0 0.5rem; }
+    .prose-dark h1 { font-size: 1.5rem; font-weight: 700; }
+    .prose-dark h2 { font-size: 1.2rem; font-weight: 600; border-bottom: 1px solid #374151; padding-bottom: 0.25rem; }
+    .prose-dark h3 { font-size: 1.05rem; font-weight: 600; color: #a5b4fc; }
+    .prose-dark p { margin: 0.5rem 0; line-height: 1.7; }
+    .prose-dark ul, .prose-dark ol { margin: 0.5rem 0 0.5rem 1.25rem; }
+    .prose-dark li { margin: 0.2rem 0; }
+    .prose-dark hr { border-color: #374151; margin: 1rem 0; }
+    .prose-dark strong { color: #f1f5f9; }
+    .prose-dark code { background: #1e293b; padding: 0.1em 0.4em; border-radius: 0.25rem; font-size: 0.875em; }
+    .prose-dark pre { background: #1e293b; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; }
+    ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #1e293b; }
+    ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 3px; }
+    .spinner { border: 3px solid #374151; border-top-color: #6366f1; border-radius: 50%; width: 1.5rem; height: 1.5rem; animation: spin 0.7s linear infinite; display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .toast { position: fixed; bottom: 1.5rem; right: 1.5rem; padding: 0.75rem 1.25rem; border-radius: 0.5rem; font-size: 0.875rem; z-index: 9999; opacity: 0; transition: opacity 0.3s; }
+    .toast.show { opacity: 1; }
+    .badge-green { background: #064e3b; color: #6ee7b7; padding: 0.15rem 0.5rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 600; }
+    .badge-red { background: #450a0a; color: #fca5a5; padding: 0.15rem 0.5rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 600; }
+    .badge-gray { background: #1e293b; color: #94a3b8; padding: 0.15rem 0.5rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 600; }
+  </style>
+</head>
+<body class="min-h-screen">
+
+<!-- Toast notification -->
+<div id="toast" class="toast bg-gray-800 text-white"></div>
+
+<!-- Header -->
+<header class="border-b border-gray-800 px-6 py-4 flex items-center justify-between">
+  <div class="flex items-center gap-3">
+    <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-sm">CR</div>
+    <span class="font-semibold text-white text-lg">Crypto Research Autopilot</span>
+    <span class="badge-gray ml-2">Venice AI</span>
+  </div>
+  <div id="status-bar" class="text-xs text-gray-500"></div>
+</header>
+
+<!-- Nav Tabs -->
+<nav class="border-b border-gray-800 px-6 flex gap-1 pt-2">
+  <button class="tab-btn active px-4 py-2 rounded-t-lg text-sm font-medium" onclick="switchTab('brief')">Morning Brief</button>
+  <button class="tab-btn px-4 py-2 rounded-t-lg text-sm font-medium text-gray-400 hover:text-white" onclick="switchTab('vault')">Vault</button>
+  <button class="tab-btn px-4 py-2 rounded-t-lg text-sm font-medium text-gray-400 hover:text-white" onclick="switchTab('watchlist')">Watchlist</button>
+  <button class="tab-btn px-4 py-2 rounded-t-lg text-sm font-medium text-gray-400 hover:text-white" onclick="switchTab('research')">Research</button>
+  <button class="tab-btn px-4 py-2 rounded-t-lg text-sm font-medium text-gray-400 hover:text-white" onclick="switchTab('settings')">Settings</button>
+</nav>
+
+<!-- Main content -->
+<main class="p-6 max-w-5xl mx-auto">
+
+  <!-- ══ BRIEF TAB ══ -->
+  <div id="tab-brief">
+    <div class="flex items-center justify-between mb-4">
+      <h1 class="text-xl font-bold text-white">Morning Brief</h1>
+      <div class="flex gap-2">
+        <label class="flex items-center gap-2 text-sm text-gray-400">
+          <input type="checkbox" id="web-search-toggle" checked class="accent-indigo-500" />
+          Venice web search
+        </label>
+        <button id="generate-btn" onclick="generateBrief()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2">
+          <span>Generate Now</span>
+        </button>
+      </div>
+    </div>
+
+    <div id="brief-status" class="hidden mb-4 p-3 rounded-lg bg-gray-800 text-sm text-gray-300 flex items-center gap-3">
+      <div class="spinner"></div>
+      <span id="brief-status-text">Generating brief — fetching live data and calling Venice AI…</span>
+    </div>
+
+    <div class="grid grid-cols-4 gap-4">
+      <!-- Brief content -->
+      <div class="col-span-3">
+        <div id="brief-content" class="bg-gray-900 border border-gray-800 rounded-xl p-6 min-h-64 prose-dark">
+          <p class="text-gray-500 text-sm">No brief loaded yet. Click <strong class="text-white">Generate Now</strong> to create today's brief, or select one from the history.</p>
+        </div>
+      </div>
+      <!-- History sidebar -->
+      <div>
+        <h2 class="text-sm font-semibold text-gray-400 mb-2 uppercase tracking-wide">History</h2>
+        <div id="brief-history" class="space-y-1 text-sm"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ VAULT TAB ══ -->
+  <div id="tab-vault" class="hidden">
+    <div class="flex items-center justify-between mb-4">
+      <h1 class="text-xl font-bold text-white">Vault</h1>
+      <button onclick="openNewFileModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium">+ New Note</button>
+    </div>
+    <div class="grid grid-cols-3 gap-4">
+      <!-- File list -->
+      <div class="col-span-1 bg-gray-900 border border-gray-800 rounded-xl p-4">
+        <div class="mb-3">
+          <select id="vault-folder-filter" onchange="loadVaultFiles()" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="">All folders</option>
+            <option value="00-Inbox">00-Inbox</option>
+            <option value="01-Market/theses">01-Market/theses</option>
+            <option value="01-Market/narratives">01-Market/narratives</option>
+            <option value="01-Market/watchlist">01-Market/watchlist</option>
+            <option value="02-Research/tokens">02-Research/tokens</option>
+            <option value="02-Research/protocols">02-Research/protocols</option>
+            <option value="02-Research/macro">02-Research/macro</option>
+            <option value="03-Journal">03-Journal</option>
+            <option value="04-Intelligence">04-Intelligence</option>
+          </select>
+        </div>
+        <div id="vault-file-list" class="space-y-1 text-sm overflow-y-auto max-h-[60vh]"></div>
+      </div>
+      <!-- Editor -->
+      <div class="col-span-2">
+        <div id="vault-editor-wrap" class="hidden">
+          <div class="flex items-center justify-between mb-2">
+            <span id="vault-editor-title" class="text-sm text-gray-400 font-mono"></span>
+            <div class="flex gap-2">
+              <button onclick="toggleVaultPreview()" id="vault-preview-btn" class="text-xs px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 text-gray-300">Preview</button>
+              <button onclick="saveVaultFile()" class="text-xs px-3 py-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white">Save</button>
+              <button onclick="deleteVaultFile()" class="text-xs px-3 py-1 rounded bg-red-900 hover:bg-red-800 text-red-300">Delete</button>
+            </div>
+          </div>
+          <textarea id="vault-editor" class="w-full h-[55vh] bg-gray-900 border border-gray-700 rounded-xl p-4 text-sm text-gray-200 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"></textarea>
+          <div id="vault-preview" class="hidden w-full min-h-[55vh] bg-gray-900 border border-gray-700 rounded-xl p-6 prose-dark overflow-y-auto"></div>
+        </div>
+        <div id="vault-editor-placeholder" class="bg-gray-900 border border-gray-800 rounded-xl p-8 text-center text-gray-600 text-sm">Select a file to edit</div>
+      </div>
+    </div>
+    <!-- New file modal -->
+    <div id="new-file-modal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+      <div class="bg-gray-900 border border-gray-700 rounded-xl p-6 w-96">
+        <h3 class="font-semibold text-white mb-4">New Note</h3>
+        <select id="new-file-folder" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-300 mb-3 focus:outline-none">
+          <option value="00-Inbox">00-Inbox</option>
+          <option value="01-Market/theses">01-Market/theses</option>
+          <option value="01-Market/narratives">01-Market/narratives</option>
+          <option value="01-Market/watchlist">01-Market/watchlist</option>
+          <option value="02-Research/tokens">02-Research/tokens</option>
+          <option value="02-Research/protocols">02-Research/protocols</option>
+          <option value="02-Research/macro">02-Research/macro</option>
+          <option value="03-Journal">03-Journal</option>
+        </select>
+        <input id="new-file-name" type="text" placeholder="filename (no .md needed)" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-300 mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        <div class="flex gap-2 justify-end">
+          <button onclick="closeNewFileModal()" class="px-4 py-2 text-sm rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300">Cancel</button>
+          <button onclick="createNewFile()" class="px-4 py-2 text-sm rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white">Create</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ WATCHLIST TAB ══ -->
+  <div id="tab-watchlist" class="hidden">
+    <div class="flex items-center justify-between mb-4">
+      <h1 class="text-xl font-bold text-white">Watchlist</h1>
+    </div>
+
+    <!-- Add token form -->
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-5 mb-5">
+      <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">Add Token</h2>
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        <input id="wl-symbol" placeholder="Symbol (e.g. ETH)" class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        <input id="wl-name" placeholder="Name (e.g. Ethereum)" class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        <input id="wl-cgid" placeholder="CoinGecko ID (e.g. ethereum)" class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+      </div>
+      <textarea id="wl-rationale" placeholder="Entry rationale — why are you watching this?" rows="2" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3 resize-none"></textarea>
+      <textarea id="wl-notes" placeholder="Additional notes (optional)" rows="2" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-3 resize-none"></textarea>
+      <button onclick="addToWatchlist()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium">Add to Watchlist</button>
+    </div>
+
+    <!-- Watchlist table -->
+    <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="border-b border-gray-800">
+          <tr class="text-gray-500 text-xs uppercase tracking-wide">
+            <th class="px-4 py-3 text-left">Symbol</th>
+            <th class="px-4 py-3 text-left">Name</th>
+            <th class="px-4 py-3 text-left">CoinGecko ID</th>
+            <th class="px-4 py-3 text-left">Entry Rationale</th>
+            <th class="px-4 py-3 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="watchlist-tbody" class="divide-y divide-gray-800 text-gray-300"></tbody>
+      </table>
+      <div id="watchlist-empty" class="hidden p-8 text-center text-gray-600 text-sm">No tokens on your watchlist yet.</div>
+    </div>
+  </div>
+
+  <!-- ══ RESEARCH TAB ══ -->
+  <div id="tab-research" class="hidden">
+    <div class="mb-4">
+      <h1 class="text-xl font-bold text-white mb-1">Token Research</h1>
+      <p class="text-sm text-gray-500">Venice AI generates a structured deep-dive note using CoinGecko live data and web search.</p>
+    </div>
+    <div class="grid grid-cols-2 gap-6">
+      <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+        <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">Research Request</h2>
+        <div class="space-y-3">
+          <input id="res-name" placeholder="Token name (e.g. Ethereum)" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <input id="res-symbol" placeholder="Symbol (e.g. ETH)" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <input id="res-cgid" placeholder="CoinGecko ID (e.g. ethereum) — optional but recommended" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <textarea id="res-notes" placeholder="Your initial observations or why you're looking at this (optional)" rows="3" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"></textarea>
+          <button id="res-btn" onclick="generateResearch()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2">
+            <span>Generate Research Note</span>
+          </button>
+        </div>
+      </div>
+      <div>
+        <div id="res-status" class="hidden mb-3 p-3 rounded-lg bg-gray-800 text-sm text-gray-300 flex items-center gap-3">
+          <div class="spinner"></div>
+          <span>Researching with Venice AI — fetching live data & web search…</span>
+        </div>
+        <div id="res-result" class="hidden bg-gray-900 border border-gray-800 rounded-xl p-5 prose-dark overflow-y-auto max-h-[65vh]"></div>
+        <div id="res-placeholder" class="bg-gray-900 border border-gray-800 rounded-xl p-8 text-center text-gray-600 text-sm">Research output will appear here.<br/>Results are saved to <code class="text-gray-500">02-Research/tokens/</code></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ SETTINGS TAB ══ -->
+  <div id="tab-settings" class="hidden">
+    <div class="mb-4">
+      <h1 class="text-xl font-bold text-white mb-1">Settings</h1>
+      <p class="text-sm text-gray-500">Configure your API keys and schedule. Changes take effect immediately.</p>
+    </div>
+    <div class="max-w-lg space-y-6">
+
+      <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+        <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">API Keys</h2>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Venice API Key <span class="text-red-400">*required</span></label>
+            <div class="flex gap-2">
+              <input id="s-venice-key" type="password" placeholder="vn-…" class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <span id="s-venice-status" class="self-center text-xs"></span>
+            </div>
+            <p class="text-xs text-gray-600 mt-1">Get yours at <a href="https://venice.ai/settings/api" target="_blank" class="text-indigo-400 hover:underline">venice.ai/settings/api</a></p>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">CoinMarketCap API Key <span class="text-gray-600">(optional)</span></label>
+            <input id="s-cmc-key" type="password" placeholder="Leave blank to skip" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <p class="text-xs text-gray-600 mt-1">Enables Fear & Greed index + sector rotation in briefs</p>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">LunarCrush API Key <span class="text-gray-600">(optional)</span></label>
+            <input id="s-lc-key" type="password" placeholder="Leave blank to skip" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <p class="text-xs text-gray-600 mt-1">Enables social sentiment + narrative momentum in briefs</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+        <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">AI Model</h2>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Venice Model</label>
+          <input id="s-model" placeholder="qwen/qwen3-235b-a22b-04-28" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <p class="text-xs text-gray-600 mt-1">Any Venice text model ID. <a href="https://docs.venice.ai/overview/models" target="_blank" class="text-indigo-400 hover:underline">Browse models →</a></p>
+        </div>
+      </div>
+
+      <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+        <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">Schedule</h2>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Brief Schedule (UTC cron)</label>
+          <input id="s-cron" placeholder="0 6 * * *" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <p class="text-xs text-gray-600 mt-1">Examples: <code class="text-gray-500">0 6 * * *</code> = 6am UTC daily&nbsp;&nbsp;|&nbsp;&nbsp;<code class="text-gray-500">0 7 * * 1-5</code> = 7am UTC weekdays</p>
+        </div>
+      </div>
+
+      <div class="bg-gray-900 border border-gray-800 rounded-xl p-5">
+        <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-4">Publishing</h2>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">GitHub Personal Access Token <span id="s-github-status"></span></label>
+            <input id="s-github-token" type="password" placeholder="ghp_…" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <p class="text-xs text-gray-600 mt-1">Needs <code class="text-gray-500">Contents: Read and Write</code> permission — <a href="https://github.com/settings/tokens" target="_blank" class="text-indigo-400 hover:underline">create token →</a></p>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">GitHub Repo</label>
+            <input id="s-github-repo" placeholder="robheat/cryptocatalyst-news" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <p class="text-xs text-gray-600 mt-1">Morning briefs publish here automatically after generation</p>
+          </div>
+        </div>
+      </div>
+
+      <button onclick="saveSettings()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-lg text-sm font-medium">Save Settings</button>
+    </div>
+  </div>
+
+</main>
+
+<script src="/js/app.js"></script>
+</body>
+</html>

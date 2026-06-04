@@ -1,0 +1,35 @@
+/* Crypto Research Autopilot — additional styles not covered by Tailwind */
+
+/* Ensure markdown content inside brief/research renders nicely */
+.prose-dark blockquote {
+  border-left: 3px solid #6366f1;
+  padding-left: 1rem;
+  color: #94a3b8;
+  margin: 0.75rem 0;
+}
+
+.prose-dark table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  margin: 0.75rem 0;
+}
+
+.prose-dark th {
+  background: #1e293b;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  color: #94a3b8;
+  font-weight: 600;
+  border: 1px solid #374151;
+}
+
+.prose-dark td {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid #374151;
+  color: #cbd5e1;
+}
+
+.prose-dark tr:hover td {
+  background: #1e293b;
+}

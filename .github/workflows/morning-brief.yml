@@ -1,0 +1,56 @@
+name: Morning Brief
+
+on:
+  schedule:
+    - cron: "0 6 * * *"   # 06:00 UTC every day
+  workflow_dispatch:        # manual trigger from the GitHub UI
+    inputs:
+      web_search:
+        description: "Enable Venice web search augmentation"
+        required: false
+        default: "true"
+        type: boolean
+
+permissions:
+  contents: write  # needed to commit the generated brief back to this repo
+
+jobs:
+  generate-brief:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate and publish morning brief
+        env:
+          VENICE_API_KEY: ${{ secrets.VENICE_API_KEY }}
+          # PUBLISH_TOKEN is a PAT with write access to robheat/cryptocatalyst-news
+          # The Python code reads the env var named GITHUB_TOKEN, so we map it here.
+          GITHUB_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
+          GITHUB_REPO: "robheat/cryptocatalyst-news"
+          CMC_API_KEY: ${{ secrets.CMC_API_KEY }}
+          LUNARCRUSH_API_KEY: ${{ secrets.LUNARCRUSH_API_KEY }}
+        run: |
+          ARGS=""
+          if [ "${{ github.event.inputs.web_search }}" = "false" ]; then
+            ARGS="--no-web-search"
+          fi
+          python run_brief.py $ARGS
+
+      - name: Commit brief to vault
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add vault/00-Inbox/
+          git diff --staged --quiet || git commit -m "📊 Morning Brief $(date -u +%Y-%m-%d)"
+          git push

@@ -1,0 +1,23 @@
+[
+  {
+    "symbol": "BTC",
+    "name": "Bitcoin",
+    "coingecko_id": "bitcoin",
+    "entry_rationale": "",
+    "notes": ""
+  },
+  {
+    "symbol": "ETH",
+    "name": "Ethereum",
+    "coingecko_id": "ethereum",
+    "entry_rationale": "",
+    "notes": ""
+  },
+  {
+    "symbol": "SOL",
+    "name": "Solana",
+    "coingecko_id": "solana",
+    "entry_rationale": "",
+    "notes": ""
+  }
+]
