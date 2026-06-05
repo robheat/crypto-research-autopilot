@@ -34,6 +34,7 @@ jobs:
       - name: Generate and publish morning brief
         env:
           VENICE_API_KEY: ${{ secrets.VENICE_API_KEY }}
+          VENICE_MODEL: "deepseek-v4-flash"
           # PUBLISH_TOKEN is a PAT with write access to robheat/cryptocatalyst-news
           # The Python code reads the env var named GITHUB_TOKEN, so we map it here.
           GITHUB_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
