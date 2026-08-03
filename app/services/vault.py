@@ -17,12 +17,23 @@ def _vault() -> Path:
 
 
 def _safe_path(relative: str) -> Path:
-    """Resolve a relative vault path, blocking directory traversal."""
+    """Resolve a relative vault path, blocking directory traversal.
+
+    A string prefix check is not sufficient: `vault/../vault-evil` starts with
+    `vault` as a string but is outside the vault directory.
+    """
     vault = _vault().resolve()
+    if Path(relative).is_absolute():
+        raise ValueError("Absolute paths are not allowed")
     target = (vault / relative).resolve()
-    if not str(target).startswith(str(vault)):
+    if target != vault and vault not in target.parents:
         raise ValueError("Path traversal not allowed")
     return target
+
+
+def _safe_dir(subfolder: str) -> Path:
+    """Resolve a vault subfolder, blocking traversal. Empty string = vault root."""
+    return _vault().resolve() if not subfolder else _safe_path(subfolder)
 
 
 # ---------------------------------------------------------------------------
@@ -30,8 +41,11 @@ def _safe_path(relative: str) -> Path:
 # ---------------------------------------------------------------------------
 
 def list_vault_files(subfolder: str = "") -> list[dict[str, Any]]:
-    """List all .md files under a vault subfolder, with metadata."""
-    root = _vault() / subfolder if subfolder else _vault()
+    """List all .md files under a vault subfolder, with metadata.
+
+    Raises ValueError if `subfolder` escapes the vault.
+    """
+    root = _safe_dir(subfolder)
     if not root.exists():
         return []
     vault_resolved = _vault().resolve()
@@ -84,7 +98,7 @@ def delete_file(relative_path: str) -> None:
 
 async def read_section(subfolder: str, max_chars: int = 12000) -> str:
     """Read all .md files in a vault subfolder, concatenated with headers."""
-    root = _vault() / subfolder
+    root = _safe_dir(subfolder)
     if not root.exists():
         return ""
     vault_resolved = _vault().resolve()

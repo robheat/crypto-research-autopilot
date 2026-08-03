@@ -1,17 +1,17 @@
 """Brief router — generate and retrieve morning briefs."""
 from __future__ import annotations
 
-import os
-from datetime import datetime, timezone
+import logging
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app.services import brief as brief_svc
 from app.services import vault
 
 router = APIRouter(prefix="/api/brief", tags=["brief"])
+
+log = logging.getLogger(__name__)
 
 
 class BriefRequest(BaseModel):
@@ -21,18 +21,23 @@ class BriefRequest(BaseModel):
 @router.post("/generate")
 async def generate_brief(req: BriefRequest):
     """Trigger a morning brief generation now."""
-    settings_obj = None
+    from app.config import get_settings
+
+    settings_obj = get_settings()
+    if not settings_obj.venice_api_key or settings_obj.venice_api_key == "your_venice_api_key_here":
+        raise HTTPException(
+            status_code=400,
+            detail="VENICE_API_KEY is not configured. Set it in the Settings tab.",
+        )
     try:
-        from app.config import get_settings
-        settings_obj = get_settings()
-        if not settings_obj.venice_api_key or settings_obj.venice_api_key == "your_venice_api_key_here":
-            raise HTTPException(status_code=400, detail="VENICE_API_KEY is not configured. Set it in the Settings tab.")
-        result = await brief_svc.generate_brief(web_search=req.web_search)
-        return result
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        return await brief_svc.generate_brief(web_search=req.web_search)
+    except Exception:
+        # Upstream errors can carry request URLs and API keys — log them, don't
+        # return them to the client.
+        log.exception("Brief generation failed")
+        raise HTTPException(
+            status_code=500, detail="Brief generation failed. See server logs for details."
+        )
 
 
 @router.get("/latest")

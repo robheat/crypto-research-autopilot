@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.config import get_settings
+from app.config import PROJECT_ROOT, get_settings
 from app.routers import brief, research, settings, vault, watchlist
 from app.scheduler import start_scheduler, stop_scheduler
 
@@ -66,7 +66,8 @@ app.include_router(watchlist.router)
 app.include_router(research.router)
 app.include_router(settings.router)
 
-# Serve static frontend — must be last
-static_dir = Path("static")
+# Serve static frontend — must be last.
+# Anchored to the project root so the server does not depend on the CWD.
+static_dir = PROJECT_ROOT / "static"
 static_dir.mkdir(exist_ok=True)
-app.mount("/", StaticFiles(directory="static", html=True), name="static")
+app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")

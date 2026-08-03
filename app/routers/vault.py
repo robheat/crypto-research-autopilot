@@ -16,7 +16,10 @@ class FileWrite(BaseModel):
 
 @router.get("/files")
 async def list_files(folder: str = ""):
-    return vault.list_vault_files(folder)
+    try:
+        return vault.list_vault_files(folder)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/file")

@@ -56,27 +56,3 @@ async def get_trending_topics(api_key: str) -> list[dict] | None:
         return None
 
 
-async def get_coins_list(api_key: str, limit: int = 20) -> list[dict] | None:
-    """Top coins ranked by galaxy score (social + market momentum)."""
-    try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.get(
-                f"{LUNARCRUSH_BASE}/coins/list/v2",
-                headers=_headers(api_key),
-                params={"sort": "galaxy_score", "limit": limit},
-            )
-            resp.raise_for_status()
-            coins = resp.json().get("data", [])
-            return [
-                {
-                    "symbol": c.get("symbol"),
-                    "name": c.get("name"),
-                    "galaxy_score": c.get("galaxy_score"),
-                    "alt_rank": c.get("alt_rank"),
-                    "sentiment": c.get("sentiment"),
-                    "change_24h": c.get("percent_change_24h"),
-                }
-                for c in coins
-            ]
-    except Exception:
-        return None

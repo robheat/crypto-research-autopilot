@@ -46,18 +46,6 @@ async def get_prices(coin_ids: list[str]) -> dict[str, Any]:
         return resp.json()
 
 
-async def search_coin(query: str) -> list[dict]:
-    """Search CoinGecko for a coin by name or symbol; returns list of matches."""
-    async with httpx.AsyncClient(timeout=20) as client:
-        resp = await client.get(
-            f"{COINGECKO_BASE}/search",
-            headers=_HEADERS,
-            params={"query": query},
-        )
-        resp.raise_for_status()
-        return resp.json().get("coins", [])[:5]
-
-
 async def get_coin_detail(coin_id: str) -> dict[str, Any]:
     """Detailed data for a single coin: description, market data, links."""
     async with httpx.AsyncClient(timeout=30) as client:

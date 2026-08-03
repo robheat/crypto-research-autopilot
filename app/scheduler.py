@@ -23,38 +23,76 @@ async def _run_brief() -> None:
         logger.error("Scheduler: brief generation failed — %s", exc)
 
 
+DEFAULT_CRON = "0 6 * * *"
+
+
 def _cron_parts(cron_expr: str) -> dict:
     """Parse a 5-field cron expression into CronTrigger kwargs."""
     parts = cron_expr.strip().split()
     if len(parts) != 5:
-        raise ValueError(f"Invalid cron expression: {cron_expr!r}")
+        raise ValueError(f"Invalid cron expression: {cron_expr!r} (expected 5 fields)")
     keys = ("minute", "hour", "day", "month", "day_of_week")
     return dict(zip(keys, parts))
 
 
-def start_scheduler(cron_expr: str) -> None:
+def build_trigger(cron_expr: str) -> CronTrigger:
+    """Validate a cron expression and build its trigger. Raises ValueError."""
     try:
-        kwargs = _cron_parts(cron_expr)
+        return CronTrigger(**_cron_parts(cron_expr))
+    except ValueError:
+        raise
+    except Exception as exc:  # APScheduler raises assorted types for bad fields
+        raise ValueError(f"Invalid cron expression: {cron_expr!r} — {exc}") from exc
+
+
+def start_scheduler(cron_expr: str) -> None:
+    """Start the scheduler, falling back to the default cron if `cron_expr` is bad.
+
+    A bad cron used to abort the whole function before `scheduler.start()`, so
+    the app ran with no scheduled briefs at all and only a log line to say so.
+    """
+    try:
+        trigger = build_trigger(cron_expr)
+    except ValueError as exc:
+        logger.error("%s — falling back to default cron %s", exc, DEFAULT_CRON)
+        trigger = build_trigger(DEFAULT_CRON)
+        cron_expr = DEFAULT_CRON
+
+    try:
         scheduler.add_job(
             _run_brief,
-            CronTrigger(**kwargs),
+            trigger,
             id=JOB_ID,
             replace_existing=True,
             misfire_grace_time=3600,
         )
-        scheduler.start()
+        if not scheduler.running:
+            scheduler.start()
         logger.info("Scheduler started with cron: %s", cron_expr)
     except Exception as exc:
         logger.error("Failed to start scheduler: %s", exc)
 
 
 def reschedule_brief(cron_expr: str) -> None:
+    """Apply a new cron to the brief job. Raises ValueError on a bad expression."""
+    trigger = build_trigger(cron_expr)  # validate before touching the scheduler
     try:
-        kwargs = _cron_parts(cron_expr)
-        scheduler.reschedule_job(JOB_ID, trigger=CronTrigger(**kwargs))
-        logger.info("Brief rescheduled to cron: %s", cron_expr)
-    except Exception as exc:
-        logger.error("Failed to reschedule: %s", exc)
+        scheduler.reschedule_job(JOB_ID, trigger=trigger)
+    except Exception:
+        # Job missing (scheduler never started cleanly) — (re)create it.
+        scheduler.add_job(
+            _run_brief, trigger, id=JOB_ID, replace_existing=True, misfire_grace_time=3600
+        )
+    logger.info("Brief rescheduled to cron: %s", cron_expr)
+
+
+def scheduler_status() -> dict:
+    """Introspection for the settings endpoint."""
+    job = scheduler.get_job(JOB_ID) if scheduler.running else None
+    return {
+        "running": scheduler.running,
+        "next_run": job.next_run_time.isoformat() if job and job.next_run_time else None,
+    }
 
 
 def stop_scheduler() -> None:

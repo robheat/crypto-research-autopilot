@@ -4,6 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Crypto Research Autopilot</title>
+  <meta name="description" content="Local control panel for the Crypto Research Autopilot vault, morning briefs and token research." />
+  <!-- Private local tool: must never be indexed if this host is ever exposed. -->
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%236366f1'/%3E%3Ctext x='16' y='22' font-family='system-ui,sans-serif' font-size='15' font-weight='700' fill='white' text-anchor='middle'%3ECR%3C/text%3E%3C/svg%3E" />
 
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -23,8 +27,11 @@
     }
   </script>
 
-  <!-- marked.js for markdown rendering -->
+  <!-- marked.js for markdown rendering, DOMPurify to sanitise model-authored HTML -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+
+  <link rel="stylesheet" href="/css/style.css" />
 
   <style>
     body { background: #0f172a; color: #e2e8f0; font-family: 'Inter', system-ui, sans-serif; }
@@ -69,11 +76,11 @@
 
 <!-- Nav Tabs -->
 <nav class="border-b border-gray-800 px-6 flex gap-1 pt-2">
-  <button class="tab-btn active px-4 py-2 rounded-t-lg text-sm font-medium" onclick="switchTab('brief')">Morning Brief</button>
-  <button class="tab-btn px-4 py-2 rounded-t-lg text-sm font-medium text-gray-400 hover:text-white" onclick="switchTab('vault')">Vault</button>
-  <button class="tab-btn px-4 py-2 rounded-t-lg text-sm font-medium text-gray-400 hover:text-white" onclick="switchTab('watchlist')">Watchlist</button>
-  <button class="tab-btn px-4 py-2 rounded-t-lg text-sm font-medium text-gray-400 hover:text-white" onclick="switchTab('research')">Research</button>
-  <button class="tab-btn px-4 py-2 rounded-t-lg text-sm font-medium text-gray-400 hover:text-white" onclick="switchTab('settings')">Settings</button>
+  <button type="button" data-tab="brief" class="tab-btn active px-4 py-2 rounded-t-lg text-sm font-medium">Morning Brief</button>
+  <button type="button" data-tab="vault" class="tab-btn px-4 py-2 rounded-t-lg text-sm font-medium text-gray-400 hover:text-white">Vault</button>
+  <button type="button" data-tab="watchlist" class="tab-btn px-4 py-2 rounded-t-lg text-sm font-medium text-gray-400 hover:text-white">Watchlist</button>
+  <button type="button" data-tab="research" class="tab-btn px-4 py-2 rounded-t-lg text-sm font-medium text-gray-400 hover:text-white">Research</button>
+  <button type="button" data-tab="settings" class="tab-btn px-4 py-2 rounded-t-lg text-sm font-medium text-gray-400 hover:text-white">Settings</button>
 </nav>
 
 <!-- Main content -->
@@ -293,6 +300,7 @@
           <label class="block text-xs text-gray-500 mb-1">Brief Schedule (UTC cron)</label>
           <input id="s-cron" placeholder="0 6 * * *" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           <p class="text-xs text-gray-600 mt-1">Examples: <code class="text-gray-500">0 6 * * *</code> = 6am UTC daily&nbsp;&nbsp;|&nbsp;&nbsp;<code class="text-gray-500">0 7 * * 1-5</code> = 7am UTC weekdays</p>
+          <p id="s-scheduler-status" class="text-xs text-gray-500 mt-2"></p>
         </div>
       </div>
 

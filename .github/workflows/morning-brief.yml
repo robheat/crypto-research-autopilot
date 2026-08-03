@@ -34,16 +34,20 @@ jobs:
       - name: Generate and publish morning brief
         env:
           VENICE_API_KEY: ${{ secrets.VENICE_API_KEY }}
-          VENICE_MODEL: "deepseek-v4-flash"
+          # Override via repo variable so the model is not pinned in three places.
+          VENICE_MODEL: ${{ vars.VENICE_MODEL || 'deepseek-v4-flash' }}
           # PUBLISH_TOKEN is a PAT with write access to robheat/cryptocatalyst-news
           # The Python code reads the env var named GITHUB_TOKEN, so we map it here.
           GITHUB_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
           GITHUB_REPO: "robheat/cryptocatalyst-news"
+          # Empty = publish to the target repo's default branch.
+          PUBLISH_BRANCH: ${{ vars.PUBLISH_BRANCH }}
+          SITE_BASE_URL: ${{ vars.SITE_BASE_URL || 'https://cryptocatalyst.news' }}
           CMC_API_KEY: ${{ secrets.CMC_API_KEY }}
           LUNARCRUSH_API_KEY: ${{ secrets.LUNARCRUSH_API_KEY }}
         run: |
           ARGS=""
-          if [ "${{ github.event.inputs.web_search }}" = "false" ]; then
+          if [ "${{ inputs.web_search }}" = "false" ]; then
             ARGS="--no-web-search"
           fi
           python run_brief.py $ARGS
@@ -53,5 +57,12 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add vault/00-Inbox/
-          git diff --staged --quiet || git commit -m "📊 Morning Brief $(date -u +%Y-%m-%d)"
-          git push
+          git diff --staged --quiet && exit 0
+          git commit -m "📊 Morning Brief $(date -u +%Y-%m-%d)"
+          # Retry against concurrent pushes so a paid-for brief is never lost.
+          for i in 1 2 3; do
+            git push && exit 0
+            git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
+          done
+          echo "::error::Failed to push brief after 3 attempts"
+          exit 1

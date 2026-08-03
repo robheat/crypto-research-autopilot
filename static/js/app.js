@@ -28,7 +28,8 @@ async function api(path, options = {}) {
 }
 
 function renderMarkdown(md) {
-  return marked.parse(md || '', { breaks: true });
+  const html = marked.parse(md || '', { breaks: true });
+  return window.DOMPurify ? DOMPurify.sanitize(html) : html;
 }
 
 // ── Tab switching ──────────────────────────────────────────────────────────
@@ -39,8 +40,10 @@ function switchTab(name) {
   TABS.forEach(t => {
     document.getElementById(`tab-${t}`).classList.toggle('hidden', t !== name);
   });
-  document.querySelectorAll('.tab-btn').forEach((btn, i) => {
-    const active = TABS[i] === name;
+  // Keyed off data-tab rather than DOM order, so adding a button cannot
+  // silently desynchronise the active state.
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    const active = btn.dataset.tab === name;
     btn.classList.toggle('active', active);
     btn.classList.toggle('text-gray-400', !active);
     btn.classList.toggle('hover:text-white', !active);
@@ -61,10 +64,12 @@ async function loadBriefHistory() {
       container.innerHTML = '<p class="text-gray-600 text-xs">No briefs yet.</p>';
       return;
     }
+    // Paths go in data attributes, never interpolated into an inline handler:
+    // a filename containing a quote would otherwise execute as script.
     container.innerHTML = history.map(f => `
-      <button onclick="loadBriefFile('${f.path}')"
-        class="w-full text-left px-2 py-1.5 rounded text-xs text-gray-400 hover:bg-gray-800 hover:text-white truncate">
-        ${f.name.replace('brief-', '')}
+      <button type="button" data-path="${escapeAttr(f.path)}"
+        class="js-brief-item w-full text-left px-2 py-1.5 rounded text-xs text-gray-400 hover:bg-gray-800 hover:text-white truncate">
+        ${escapeHtml(f.name.replace('brief-', ''))}
       </button>
     `).join('');
 
@@ -122,10 +127,10 @@ async function loadVaultFiles() {
       return;
     }
     container.innerHTML = files.map(f => `
-      <button onclick="openVaultFile('${f.path}')"
-        class="w-full text-left px-2 py-1.5 rounded text-xs hover:bg-gray-800 ${currentVaultFile === f.path ? 'bg-gray-800 text-white' : 'text-gray-400'}">
-        <div class="font-medium truncate">${f.name}</div>
-        <div class="text-gray-600 truncate text-[10px]">${f.folder}</div>
+      <button type="button" data-path="${escapeAttr(f.path)}"
+        class="js-vault-item w-full text-left px-2 py-1.5 rounded text-xs hover:bg-gray-800 ${currentVaultFile === f.path ? 'bg-gray-800 text-white' : 'text-gray-400'}">
+        <div class="font-medium truncate">${escapeHtml(f.name)}</div>
+        <div class="text-gray-600 truncate text-[10px]">${escapeHtml(f.folder)}</div>
       </button>
     `).join('');
   } catch (e) {
@@ -248,7 +253,7 @@ async function loadWatchlist() {
         <td class="px-4 py-3 text-gray-500 text-xs font-mono">${escapeHtml(t.coingecko_id || '—')}</td>
         <td class="px-4 py-3 text-gray-400 text-xs max-w-xs truncate">${escapeHtml(t.entry_rationale || '—')}</td>
         <td class="px-4 py-3 text-right">
-          <button onclick="removeToken('${escapeHtml(t.symbol)}')" class="text-xs text-red-400 hover:text-red-300">Remove</button>
+          <button type="button" data-symbol="${escapeAttr(t.symbol || '')}" class="js-remove-token text-xs text-red-400 hover:text-red-300">Remove</button>
         </td>
       </tr>
     `).join('');
@@ -341,10 +346,18 @@ async function loadSettings() {
       ? '<span class="badge-green">✓ Set</span>'
       : '<span class="badge-red">Not set</span>';
     document.getElementById('s-model').value = s.venice_model || '';
-    document.getElementById('s-cron').value = s.brief_schedule_cron || '0 6 * * *';    document.getElementById('s-github-status').innerHTML = s.github_token_set
+    document.getElementById('s-cron').value = s.brief_schedule_cron || '0 6 * * *';
+    document.getElementById('s-github-status').innerHTML = s.github_token_set
       ? '<span class="badge-green">\u2713 Set</span>'
       : '<span class="badge-gray">Not set</span>';
-    document.getElementById('s-github-repo').value = s.github_repo || 'robheat/cryptocatalyst-news';    // Don't pre-fill password fields for security
+    document.getElementById('s-github-repo').value = s.github_repo || '';
+    // Password fields are deliberately never pre-filled.
+    const sched = document.getElementById('s-scheduler-status');
+    if (sched) {
+      sched.textContent = s.scheduler && s.scheduler.running
+        ? `Scheduler running \u2014 next run ${s.scheduler.next_run || 'unknown'}`
+        : 'Scheduler not running';
+    }
   } catch (e) {
     toast('Failed to load settings', 'error');
   }
@@ -394,10 +407,32 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
+// Single quotes must be escaped too — escapeHtml alone left attribute values
+// breakable by a value containing an apostrophe.
+function escapeAttr(str) {
+  return escapeHtml(str).replace(/'/g, '&#39;');
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────
 
+// Delegated handlers for dynamically rendered lists.
+function delegate(containerId, selector, handler) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.addEventListener('click', evt => {
+    const target = evt.target.closest(selector);
+    if (target && container.contains(target)) handler(target);
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  });
+  delegate('brief-history', '.js-brief-item', el => loadBriefFile(el.dataset.path));
+  delegate('vault-file-list', '.js-vault-item', el => openVaultFile(el.dataset.path));
+  delegate('watchlist-tbody', '.js-remove-token', el => removeToken(el.dataset.symbol));
+
   loadBriefHistory();
-  // Show status
   document.getElementById('status-bar').textContent = `Vault: vault/ | ${new Date().toLocaleString()}`;
 });

@@ -46,25 +46,3 @@ async def get_global_metrics(api_key: str) -> dict[str, Any] | None:
         return None
 
 
-async def get_top_gainers(api_key: str, limit: int = 10) -> list[dict] | None:
-    """Top gaining tokens by 24h percent change."""
-    try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.get(
-                f"{CMC_BASE}/cryptocurrency/listings/latest",
-                headers=_headers(api_key),
-                params={"sort": "percent_change_24h", "sort_dir": "desc", "limit": limit},
-            )
-            resp.raise_for_status()
-            coins = resp.json().get("data", [])
-            return [
-                {
-                    "symbol": c["symbol"],
-                    "name": c["name"],
-                    "price": c["quote"]["USD"]["price"],
-                    "change_24h": c["quote"]["USD"]["percent_change_24h"],
-                }
-                for c in coins
-            ]
-    except Exception:
-        return None

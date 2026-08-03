@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 from app.services import vault
 
@@ -10,11 +10,17 @@ router = APIRouter(prefix="/api/watchlist", tags=["watchlist"])
 
 
 class Token(BaseModel):
-    symbol: str
-    name: str
-    coingecko_id: str = ""
+    # `symbol` becomes a filename, so it must not contain separators or dots.
+    symbol: str = Field(min_length=1, max_length=20, pattern=r"^[A-Za-z0-9]+$")
+    name: str = Field(min_length=1, max_length=100)
+    coingecko_id: str = Field(default="", max_length=100, pattern=r"^[a-z0-9-]*$")
     entry_rationale: str = ""
     notes: str = ""
+
+    @field_validator("symbol")
+    @classmethod
+    def _upper(cls, v: str) -> str:
+        return v.upper()
 
 
 @router.get("")

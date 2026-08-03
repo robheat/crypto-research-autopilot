@@ -2,40 +2,31 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
-from app.config import get_settings
+from app.config import PROJECT_ROOT, get_settings
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
-ENV_FILE = Path(".env")
+# Anchored to the project root so the file written is the file pydantic-settings
+# reads, regardless of the process working directory.
+ENV_FILE = PROJECT_ROOT / ".env"
 
 # Keys that are safe to expose to the frontend (masked)
 MASKED_KEYS = {"venice_api_key", "cmc_api_key", "lunarcrush_api_key", "github_token"}
 
 
-def _read_env_file() -> dict[str, str]:
-    if not ENV_FILE.exists():
-        return {}
-    result: dict[str, str] = {}
-    for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#"):
-            continue
-        if "=" in line:
-            key, _, val = line.partition("=")
-            result[key.strip().lower()] = val.strip()
-    return result
-
-
 def _write_env_value(key: str, value: str) -> None:
     """Update a single key in the .env file."""
+    if "\n" in value or "\r" in value:
+        raise ValueError(f"{key} must not contain newlines")
     key_upper = key.upper()
     text = ENV_FILE.read_text(encoding="utf-8") if ENV_FILE.exists() else ""
-    pattern = re.compile(rf"^{re.escape(key_upper)}=.*$", re.MULTILINE)
+    # \r is matched explicitly: on CRLF files `.*$` otherwise leaves a stray \r
+    # attached to the replaced line.
+    pattern = re.compile(rf"^{re.escape(key_upper)}=[^\r\n]*\r?$", re.MULTILINE)
     new_line = f"{key_upper}={value}"
     if pattern.search(text):
         text = pattern.sub(new_line, text)
@@ -53,18 +44,46 @@ class SettingsUpdate(BaseModel):
     github_token: str | None = None
     github_repo: str | None = None
 
+    @field_validator("brief_schedule_cron")
+    @classmethod
+    def _check_cron(cls, v: str | None) -> str | None:
+        """Reject a bad cron here rather than writing it to .env and failing later."""
+        if v is None:
+            return v
+        from app.scheduler import build_trigger
+
+        build_trigger(v)  # raises ValueError -> 422
+        return v.strip()
+
+    @field_validator("github_repo")
+    @classmethod
+    def _check_repo(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        v = v.strip()
+        if v and not re.fullmatch(r"[\w.-]+/[\w.-]+", v):
+            raise ValueError("github_repo must be in 'owner/name' form")
+        return v
+
 
 @router.get("")
 async def get_settings_view():
-    env = _read_env_file()
+    # Read through the Settings object so values supplied as real environment
+    # variables (GitHub Actions, docker) are reflected, not just .env entries.
+    cfg = get_settings()
+    from app.scheduler import scheduler_status
+
     return {
-        "venice_api_key_set": bool(env.get("venice_api_key") and env["venice_api_key"] != "your_venice_api_key_here"),
-        "venice_model": env.get("venice_model", "qwen/qwen3-235b-a22b-04-28"),
-        "cmc_api_key_set": bool(env.get("cmc_api_key")),
-        "lunarcrush_api_key_set": bool(env.get("lunarcrush_api_key")),
-        "brief_schedule_cron": env.get("brief_schedule_cron", "0 6 * * *"),
-        "github_token_set": bool(env.get("github_token")),
-        "github_repo": env.get("github_repo", "robheat/cryptocatalyst-news"),
+        "venice_api_key_set": bool(
+            cfg.venice_api_key and cfg.venice_api_key != "your_venice_api_key_here"
+        ),
+        "venice_model": cfg.venice_model,
+        "cmc_api_key_set": bool(cfg.cmc_api_key),
+        "lunarcrush_api_key_set": bool(cfg.lunarcrush_api_key),
+        "brief_schedule_cron": cfg.brief_schedule_cron,
+        "github_token_set": bool(cfg.github_token),
+        "github_repo": cfg.github_repo,
+        "scheduler": scheduler_status(),
     }
 
 
@@ -86,12 +105,10 @@ async def update_settings(body: SettingsUpdate):
     if body.brief_schedule_cron is not None:
         _write_env_value("brief_schedule_cron", body.brief_schedule_cron)
         updated.append("brief_schedule_cron")
-        # Reload scheduler with new cron
-        try:
-            from app.scheduler import reschedule_brief
-            reschedule_brief(body.brief_schedule_cron)
-        except Exception:
-            pass
+        # Reload scheduler with the new cron (already validated by the model).
+        from app.scheduler import reschedule_brief
+
+        reschedule_brief(body.brief_schedule_cron)
     if body.github_token is not None:
         _write_env_value("github_token", body.github_token)
         updated.append("github_token")
