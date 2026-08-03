@@ -54,13 +54,17 @@ async def generate_image(
     width: int = 1280,
     height: int = 720,
 ) -> bytes:
-    """Generate an image via Venice image API. Returns raw PNG bytes."""
+    """Generate an image via Venice image API. Returns raw WebP bytes.
+
+    WebP instead of PNG — same visual quality tier, a fraction of the file
+    size, which is what actually drives storage/bandwidth cost per brief.
+    """
     payload = {
         "model": model,
         "prompt": prompt,
         "width": width,
         "height": height,
-        "format": "png",
+        "format": "webp",
         "hide_watermark": True,
         "return_binary": False,
     }

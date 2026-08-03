@@ -70,7 +70,7 @@ async def push_brief(
         tree_entries = []
         for path, blob_bytes in (
             (f"content/articles/{slug}.json", article_bytes),
-            (f"public/images/articles/{slug}.png", image_bytes),
+            (f"public/images/articles/{slug}.webp", image_bytes),
         ):
             if blob_bytes is None:
                 continue

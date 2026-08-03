@@ -753,7 +753,7 @@ async def generate_brief(web_search: bool = True) -> dict[str, str]:
             try:
                 img_prompt = _make_image_prompt(content)
                 image_bytes = await venice.generate_image(img_prompt)
-                _attach_image(article, f"/images/articles/{slug}.png")
+                _attach_image(article, f"/images/articles/{slug}.webp")
                 log.info("Brief image generated: %s", article["imageUrl"])
             except Exception as img_exc:
                 log.warning("Image generation skipped: %s", img_exc)
