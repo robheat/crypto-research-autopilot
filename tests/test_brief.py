@@ -214,7 +214,7 @@ def test_global_market_handles_empty_and_partial_payloads():
 
 def test_canonical_url_points_at_the_article_not_the_site_root():
     slug, article = _brief_to_article(SAMPLE_BRIEF, "2026-06-01")
-    expected = f"https://cryptocatalyst.news/articles/{slug}"
+    expected = f"https://www.cryptocatalyst.news/articles/{slug}"
     assert article["canonicalUrl"] == expected
     assert article["sourceUrl"] == expected
 
@@ -250,7 +250,7 @@ def test_image_attachment_absolutises_the_url():
 
     _, article = _brief_to_article(SAMPLE_BRIEF, "2026-06-01")
     _attach_image(article, "/images/articles/x.png")
-    assert article["imageUrl"] == "https://cryptocatalyst.news/images/articles/x.png"
+    assert article["imageUrl"] == "https://www.cryptocatalyst.news/images/articles/x.png"
     assert article["schema"]["image"]["url"] == article["imageUrl"]
     assert article["schema"]["image"]["caption"] == article["imageAlt"]
 

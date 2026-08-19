@@ -20,11 +20,11 @@ class Settings(BaseSettings):
     publish_branch: str = ""
 
     # Publishing identity — feeds canonical URLs and schema.org structured data.
-    site_base_url: str = "https://cryptocatalyst.news"
+    site_base_url: str = "https://www.cryptocatalyst.news"
     publisher_name: str = "CryptoCatalyst News"
-    publisher_logo_url: str = "https://cryptocatalyst.news/logo.png"
+    publisher_logo_url: str = "https://www.cryptocatalyst.news/logo.png"
     author_name: str = "Crypto Research Autopilot"
-    author_url: str = "https://cryptocatalyst.news/about"
+    author_url: str = "https://www.cryptocatalyst.news/about"
     disclaimer: str = (
         "This article is research commentary, not financial advice. "
         "Digital assets are volatile and you may lose capital."
