@@ -42,7 +42,7 @@ jobs:
           GITHUB_REPO: "robheat/cryptocatalyst-news"
           # Empty = publish to the target repo's default branch.
           PUBLISH_BRANCH: ${{ vars.PUBLISH_BRANCH }}
-          SITE_BASE_URL: ${{ vars.SITE_BASE_URL || 'https://cryptocatalyst.news' }}
+          SITE_BASE_URL: ${{ vars.SITE_BASE_URL || 'https://www.cryptocatalyst.news' }}
           CMC_API_KEY: ${{ secrets.CMC_API_KEY }}
           LUNARCRUSH_API_KEY: ${{ secrets.LUNARCRUSH_API_KEY }}
         run: |
