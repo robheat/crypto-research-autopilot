@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from app.config import get_settings
-from app.services import coingecko, coinmarketcap, lunarcrush, vault, venice
+from app.services import chaintvl, coingecko, coinmarketcap, lunarcrush, vault, venice
 
 log = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ _KNOWN_TAGS: dict[str, str] = {
     "nft": "nft", "regulation": "regulation", "policy": "policy",
     "on-chain": "on-chain", "onchain": "on-chain",
     "narrative": "narrative", "sentiment": "market-sentiment",
-    "institutional": "institutional",
+    "institutional": "institutional", "tvl": "tvl",
 }
 
 # Assets we can entity-link in schema.org `about`. Entity linking is a strong
@@ -494,6 +494,17 @@ async def _fetch_lunarcrush(api_key: str, symbols: list[str]) -> dict[str, Any]:
     return {"topics": topics, "sentiments": sentiments}
 
 
+async def _fetch_chaintvl() -> dict[str, Any]:
+    """ChainTVL has no SLA and no API — an HTML change there should skip this
+    section, not take the whole brief down with it.
+    """
+    try:
+        return await chaintvl.get_tvl_snapshot()
+    except Exception as exc:
+        log.warning("ChainTVL fetch failed: %s", exc)
+        return {}
+
+
 # ---------------------------------------------------------------------------
 # Prompt building
 # ---------------------------------------------------------------------------
@@ -568,6 +579,46 @@ def _format_trending(trending: list) -> str:
     return "\n".join(lines)
 
 
+def _format_chaintvl(data: dict) -> str:
+    """Cross-chain TVL + capital-flow snapshot from chaintvl.com, or empty
+    string if the fetch/parse failed — the section is skipped entirely rather
+    than shown with placeholder data.
+    """
+    summary = data.get("summary") or {}
+    chains = data.get("chains") or []
+    flows = data.get("flows") or {}
+    if not summary and not chains:
+        return ""
+
+    lines = []
+    total = summary.get("Total DeFi TVL")
+    if total:
+        delta = f" ({total['delta']})" if total.get("delta") else ""
+        lines.append(f"Total DeFi TVL: {total['value']}{delta}")
+    change_7d = summary.get("7-day change")
+    if change_7d:
+        delta = f" ({change_7d['delta']})" if change_7d.get("delta") else ""
+        lines.append(f"7-day TVL change: {change_7d['value']}{delta}")
+    stables = summary.get("Tracked stablecoin supply (top chains)")
+    if stables:
+        lines.append(f"Tracked stablecoin supply: {stables['value']}")
+
+    outflow = flows.get("Total outflow (losing chains)")
+    inflow = flows.get("Total inflow (gaining chains)")
+    if outflow or inflow:
+        lines.append(
+            f"24h chain rotation: {inflow or 'n/a'} into gaining chains, "
+            f"{outflow or 'n/a'} out of losing chains"
+        )
+
+    if chains:
+        lines.append("Top chains by TVL (24h / 7d):")
+        for c in chains[:8]:
+            lines.append(f"  {c['chain']}: {c['tvl']} ({c['change_24h']} / {c['change_7d']})")
+
+    return "\n".join(lines)
+
+
 def _build_brief_prompt(
     system_context: str,
     vault_context: str,
@@ -576,6 +627,7 @@ def _build_brief_prompt(
     cg = live_data.get("coingecko", {})
     cmc = live_data.get("cmc", {})
     lc = live_data.get("lunarcrush", {})
+    ctvl = live_data.get("chaintvl", {})
     watchlist = live_data.get("watchlist_tokens", [])
     today = datetime.now(tz=timezone.utc).strftime("%A, %B %d, %Y")
 
@@ -627,6 +679,10 @@ def _build_brief_prompt(
         if sent_lines:
             market_section += "\n\n### LunarCrush Watchlist Sentiment\n" + "\n".join(sent_lines)
 
+    ctvl_str = _format_chaintvl(ctvl)
+    if ctvl_str:
+        market_section += f"\n\n### ChainTVL — Cross-Chain TVL & Capital Flows\n{ctvl_str}"
+
     prompt = f"""{system_context}
 
 ---
@@ -661,6 +717,9 @@ Use EXACTLY this structure:
 
 ### 5. OPEN QUESTION
 [One question the market should be sitting with. Not a task. A question worth thinking about.]
+
+### 6. TVL FLOWS
+[Using the ChainTVL data above, cover where capital is rotating across chains — the gaining vs. losing chains, and how today's total DeFi TVL and stablecoin supply compare to recent trend. Cite specific figures. If no ChainTVL data is present above, write one sentence noting that chain-flow data was unavailable today and omit the rest of this section. End this section, on its own line, with exactly: "Data via [ChainTVL](https://chaintvl.com)."]
 
 Be direct. No padding. Every sentence earns its place. No second-person."""
 
@@ -711,16 +770,19 @@ async def generate_brief(web_search: bool = True) -> dict[str, str]:
         if settings.lunarcrush_api_key
         else asyncio.sleep(0)
     )
+    ctvl_task = _fetch_chaintvl()
 
-    cg_data, cmc_data, lc_data = await asyncio.gather(cg_task, cmc_task, lc_task)
+    cg_data, cmc_data, lc_data, ctvl_data = await asyncio.gather(cg_task, cmc_task, lc_task, ctvl_task)
     cg_data = cg_data if isinstance(cg_data, dict) else {}
     cmc_data = cmc_data if isinstance(cmc_data, dict) else {}
     lc_data = lc_data if isinstance(lc_data, dict) else {}
+    ctvl_data = ctvl_data if isinstance(ctvl_data, dict) else {}
 
     live_data = {
         "coingecko": cg_data,
         "cmc": cmc_data,
         "lunarcrush": lc_data,
+        "chaintvl": ctvl_data,
         "watchlist_tokens": watchlist_tokens,
     }
 

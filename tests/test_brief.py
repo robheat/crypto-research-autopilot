@@ -13,6 +13,7 @@ from app.services.brief import (
     _extract_lead_signal,
     _extract_tags,
     _first_prose_paragraph,
+    _format_chaintvl,
     _format_global_market,
     _format_prices,
     _md_to_plaintext,
@@ -206,6 +207,33 @@ def test_global_market_handles_empty_and_partial_payloads():
     assert "BTC dominance: 57.2%" in _format_global_market(
         {"market_cap_percentage": {"btc": 57.2}}
     )
+
+
+def test_chaintvl_formats_summary_flows_and_top_chains():
+    out = _format_chaintvl({
+        "summary": {
+            "Total DeFi TVL": {"value": "$89.76B", "delta": "+3.1% 24h"},
+            "7-day change": {"value": "$3.25B", "delta": "+3.8% 7d"},
+            "Tracked stablecoin supply (top chains)": {"value": "$296.65B", "delta": None},
+        },
+        "chains": [
+            {"chain": "Ethereum", "tvl": "$50.91B", "change_24h": "+3.3%", "change_7d": "+4.1%",
+             "change_30d": "+21.0%", "stablecoin_supply": "$147.26B"},
+        ],
+        "flows": {
+            "Total outflow (losing chains)": "$42.36M",
+            "Total inflow (gaining chains)": "$2.77B",
+        },
+    })
+    assert "Total DeFi TVL: $89.76B (+3.1% 24h)" in out
+    assert "Tracked stablecoin supply: $296.65B" in out
+    assert "$2.77B into gaining chains, $42.36M out of losing chains" in out
+    assert "Ethereum: $50.91B (+3.3% / +4.1%)" in out
+
+
+def test_chaintvl_returns_empty_string_when_unavailable():
+    assert _format_chaintvl({}) == ""
+    assert _format_chaintvl({"summary": {}, "chains": [], "flows": {}}) == ""
 
 
 # ---------------------------------------------------------------------------
