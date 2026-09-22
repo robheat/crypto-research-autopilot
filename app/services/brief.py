@@ -719,7 +719,7 @@ Use EXACTLY this structure:
 [One question the market should be sitting with. Not a task. A question worth thinking about.]
 
 ### 6. TVL FLOWS
-[Using the ChainTVL data above, cover where capital is rotating across chains — the gaining vs. losing chains, and how today's total DeFi TVL and stablecoin supply compare to recent trend. Cite specific figures. If no ChainTVL data is present above, write one sentence noting that chain-flow data was unavailable today and omit the rest of this section. End this section, on its own line, with exactly: "Data via [ChainTVL](https://chaintvl.com)."]
+[Using the ChainTVL data above, cover where capital is rotating across chains — the gaining vs. losing chains, and how today's total DeFi TVL and stablecoin supply compare to recent trend. Cite specific figures. If no ChainTVL data is present above, write one sentence noting that chain-flow data was unavailable today and omit the rest of this section. End this section, on its own line, with exactly: "Data via [ChainTVL](https://www.chaintvl.com/)."]
 
 Be direct. No padding. Every sentence earns its place. No second-person."""
 
