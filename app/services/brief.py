@@ -367,12 +367,39 @@ def _build_schema(
     return schema
 
 
+_BRIEF_SOURCE_RE = re.compile(
+    r'(?P<label>[Ss]ources?):\s*`?(?:[\w./-]*/)?brief-(?P<date>\d{4}-\d{2}-\d{2})\.md`?'
+)
+
+
+def _link_brief_sources(md: str) -> str:
+    """Rewrite vault-file citations of earlier briefs into links to the published article.
+
+    The model cites theses as "(source: `01-Market/theses/brief-2026-09-07.md`)" —
+    a vault path meaningless to readers. Every brief-YYYY-MM-DD.md corresponds to
+    the article published for that date, so link there instead.
+    """
+    cfg = get_settings()
+
+    def _replace(match: re.Match) -> str:
+        date_str = match.group("date")
+        try:
+            label = datetime.strptime(date_str, "%Y-%m-%d").strftime("%B %d, %Y").replace(" 0", " ")
+        except ValueError:
+            return match.group(0)
+        url = cfg.article_url(f"{date_str}-crypto-research-morning-brief")
+        return f'{match.group("label")}: [Morning Brief, {label}]({url})'
+
+    return _BRIEF_SOURCE_RE.sub(_replace, md)
+
+
 def _brief_to_article(content: str, date_str: str, title: str | None = None) -> tuple[str, dict]:
     """Convert a markdown brief into the cryptocatalyst.news article payload.
 
     Returns (slug, article_dict).
     """
     cfg = get_settings()
+    content = _link_brief_sources(content)
     plain = _md_to_plaintext(content)
     text_lower = plain.lower()
 

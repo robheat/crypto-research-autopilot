@@ -16,6 +16,7 @@ from app.services.brief import (
     _format_chaintvl,
     _format_global_market,
     _format_prices,
+    _link_brief_sources,
     _md_to_plaintext,
     _pick_category,
     _prepare_article_body,
@@ -325,3 +326,29 @@ def test_plaintext_strips_links_to_their_label():
 def test_plaintext_strips_blockquotes_and_emphasis():
     out = _md_to_plaintext("> **Quoted** and *emphasised* and `code`")
     assert out == "Quoted and emphasised and code"
+
+
+# ---------------------------------------------------------------------------
+# Thesis citations link to the published brief, not the vault file
+# ---------------------------------------------------------------------------
+
+def test_brief_source_citation_links_to_published_article():
+    md = "supported (source: `01-Market/theses/brief-2026-09-07.md`) today."
+    out = _link_brief_sources(md)
+    assert out == (
+        "supported (source: [Morning Brief, September 7, 2026]"
+        "(https://www.cryptocatalyst.news/articles/2026-09-07-crypto-research-morning-brief)) today."
+    )
+
+
+def test_non_brief_sources_and_invalid_dates_are_left_alone():
+    md = "(source: `01-Market/theses/btc-thesis.md`) and (source: `x/brief-2026-13-45.md`)"
+    assert _link_brief_sources(md) == md
+
+
+def test_article_body_uses_linked_sources_but_vault_content_is_unchanged():
+    brief = SAMPLE_BRIEF + "\n(source: `01-Market/theses/brief-2026-05-29.md`)\n"
+    _, article = _brief_to_article(brief, "2026-06-01")
+    assert "2026-05-29-crypto-research-morning-brief" in article["body"]
+    assert "brief-2026-05-29.md" not in article["body"]
+    assert "brief-2026-05-29.md" in brief
