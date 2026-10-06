@@ -1,12 +1,45 @@
 """Venice API client — OpenAI-compatible with optional web search."""
 from __future__ import annotations
 
+import asyncio
 import base64
+import logging
+
 import httpx
 
 from app.config import get_settings
 
 VENICE_BASE_URL = "https://api.venice.ai/api/v1"
+
+logger = logging.getLogger(__name__)
+
+# Web-search-augmented completions routinely take minutes; on 2026-10-06 the
+# brief call outlasted the old flat 120s timeout and the whole run failed.
+# Generous read time, quick failure on connecting.
+TIMEOUT = httpx.Timeout(connect=15.0, read=300.0, write=30.0, pool=15.0)
+# Waits before attempts 2 and 3. Timeouts, dropped connections, 429
+# (Venice's "model overloaded") and 5xx are worth retrying; other 4xx aren't.
+RETRY_DELAYS = (15, 45)
+RETRY_STATUSES = {429, 500, 502, 503, 504}
+
+
+async def _post(path: str, payload: dict) -> dict:
+    """POST to Venice with retries on transient failures; returns the JSON body."""
+    for attempt, delay in enumerate((*RETRY_DELAYS, None), start=1):
+        try:
+            async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+                resp = await client.post(f"{VENICE_BASE_URL}{path}", headers=_headers(), json=payload)
+            if resp.status_code in RETRY_STATUSES and delay is not None:
+                logger.warning("Venice %s returned %s (attempt %d); retrying in %ss", path, resp.status_code, attempt, delay)
+            else:
+                resp.raise_for_status()
+                return resp.json()
+        except (httpx.TimeoutException, httpx.TransportError) as exc:
+            if delay is None:
+                raise
+            logger.warning("Venice %s failed with %s (attempt %d); retrying in %ss", path, type(exc).__name__, attempt, delay)
+        await asyncio.sleep(delay)
+    raise RuntimeError("unreachable")
 
 
 def _headers() -> dict[str, str]:
@@ -36,15 +69,8 @@ async def chat_complete(
     if web_search:
         payload["venice_parameters"] = {"enable_web_search": "on"}
 
-    async with httpx.AsyncClient(timeout=120) as client:
-        resp = await client.post(
-            f"{VENICE_BASE_URL}/chat/completions",
-            headers=_headers(),
-            json=payload,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        return data["choices"][0]["message"]["content"]
+    data = await _post("/chat/completions", payload)
+    return data["choices"][0]["message"]["content"]
 
 
 async def generate_image(
@@ -68,15 +94,8 @@ async def generate_image(
         "hide_watermark": True,
         "return_binary": False,
     }
-    async with httpx.AsyncClient(timeout=120) as client:
-        resp = await client.post(
-            f"{VENICE_BASE_URL}/image/generate",
-            headers=_headers(),
-            json=payload,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        return base64.b64decode(data["images"][0])
+    data = await _post("/image/generate", payload)
+    return base64.b64decode(data["images"][0])
 
 
 async def list_models() -> list[dict]:
