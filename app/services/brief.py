@@ -285,6 +285,9 @@ async def _generate_headline(content: str, date_fmt: str) -> str:
             web_search=False,
             temperature=0.3,
             max_tokens=60,
+            # A one-line headline needs no thinking; with it, the model's
+            # reasoning used up the 60 tokens and the headline came back cut.
+            reasoning_effort="none",
         )
         headline = _md_to_plaintext(raw or "").strip().strip('"\u201c\u201d').rstrip(".")
         headline = " ".join(headline.split())
@@ -748,6 +751,9 @@ Use EXACTLY this structure:
 ### 6. TVL FLOWS
 [Using the ChainTVL data above, cover where capital is rotating across chains — the gaining vs. losing chains, and how today's total DeFi TVL and stablecoin supply compare to recent trend. Cite specific figures. If no ChainTVL data is present above, write one sentence noting that chain-flow data was unavailable today and omit the rest of this section. End this section, on its own line, with exactly: "Data via [ChainTVL](https://www.chaintvl.com/)."]
 
+All six sections are required, in this order, each under its own "### N." heading — including 6. TVL FLOWS.
+Length: about 700-1,000 words in total. Sections 1, 2, 3 and 6 each get a few substantive paragraphs with specific figures; 4 and 5 stay to one or two sentences. This is also published as an article, so depth matters, but never pad.
+
 Be direct. No padding. Every sentence earns its place. No second-person."""
 
     return [
@@ -819,7 +825,10 @@ async def generate_brief(web_search: bool = True) -> dict[str, str]:
         messages,
         web_search=web_search,
         temperature=0.5,
-        max_tokens=3000,
+        # Some analysis, but bounded, and headroom so thinking can never
+        # crowd out the brief itself (a brief is ~2,100 tokens).
+        max_tokens=6000,
+        reasoning_effort="low",
     )
 
     # 4. Save to vault
@@ -943,7 +952,8 @@ Be precise and analytical. Fill every section with substantive content. No fille
         ],
         web_search=True,
         temperature=0.4,
-        max_tokens=2000,
+        max_tokens=4000,
+        reasoning_effort="low",
     )
 
     filename = f"02-Research/tokens/{symbol.lower()}-{today}.md"

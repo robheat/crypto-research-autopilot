@@ -57,8 +57,16 @@ async def chat_complete(
     web_search: bool = False,
     temperature: float = 0.7,
     max_tokens: int = 4096,
+    reasoning_effort: str | None = None,
 ) -> str:
-    """Send a chat completion request and return the assistant message content."""
+    """Send a chat completion request and return the assistant message content.
+
+    reasoning_effort ("none" | "low" | "medium" | "high"): how much a reasoning
+    model thinks first. Thinking counts against max_tokens, and models differ
+    in their default (GPT-6 Luna defaults to high): on 2026-10-10 Luna's
+    default thinking used the brief's whole 3,000-token budget and returned no
+    text. Set it explicitly on every call that matters.
+    """
     settings = get_settings()
     payload: dict = {
         "model": model or settings.venice_model,
@@ -68,9 +76,19 @@ async def chat_complete(
     }
     if web_search:
         payload["venice_parameters"] = {"enable_web_search": "on"}
+    if reasoning_effort:
+        payload["reasoning_effort"] = reasoning_effort
 
     data = await _post("/chat/completions", payload)
-    return data["choices"][0]["message"]["content"]
+    choice = data["choices"][0]
+    content = choice["message"].get("content")
+    if not content:
+        # An empty reply is a failure, not an empty brief.
+        raise RuntimeError(
+            f"Venice returned no text (finish_reason={choice.get('finish_reason')}, "
+            f"usage={data.get('usage')})"
+        )
+    return content
 
 
 async def generate_image(

@@ -35,7 +35,9 @@ jobs:
         env:
           VENICE_API_KEY: ${{ secrets.VENICE_API_KEY }}
           # Override via repo variable so the model is not pinned in three places.
-          VENICE_MODEL: ${{ vars.VENICE_MODEL || 'deepseek-v4-flash' }}
+          # GPT-6 Luna since 2026-10-10 (was DeepSeek V4 Flash). Tested locally on
+          # the real brief prompt: all six sections, 700-1,000 words, ~17s vs ~55s.
+          VENICE_MODEL: ${{ vars.VENICE_MODEL || 'openai-gpt-6-luna' }}
           # PUBLISH_TOKEN is a PAT with write access to robheat/cryptocatalyst-news
           # The Python code reads the env var named GITHUB_TOKEN, so we map it here.
           GITHUB_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
